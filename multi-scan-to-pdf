@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+
+#
+# Notes:
+# * Working around a broken SANE backened and not using batch
+#
+
+trap "echo Exited!; exit;" SIGINT SIGTERM
+
+SCANNER="hpaio:/usb/ENVY_4520_series?serial=TH68K4K29X0660"
+DPI=200
+
+counter=0
+while :; do
+  read -p "Press [ENTER] to continue or [ANY-KEY] + [ENTER] to stop:" key
+  if [ -z "${key}" ]; then
+      echo "Wainting for scanner ...."
+      # TODO
+  else
+      break
+  fi
+
+  raw_file=$(printf "page-%03d.pnm" ${counter})
+  comp_file=$(printf "page-%03d.png" ${counter})
+
+  echo "Sanning ${filename}"
+  scanimage --device-name="${SCANNER}" --mode=Gray --resolution="${DPI}" --progress > "${raw_file}"
+  (convert "${raw_file}" -type grayscale \
+                         -units PixelsPerInch -density "${DPI}" \
+                         -alpha remove \
+                         -quality 100 \
+           "${comp_file}" \
+   && rm "${raw_file}") &
+
+  counter=$(expr ${counter} + 1)
+done
+
+
+gs -sDEVICE=pdfwrite \
+   -dCompatibilityLevel=1.4 \
+   -dPDFSETTINGS=/default \
+   -dNOPAUSE \
+   -dQUIET \
+   -dBATCH \
+   -dDetectDuplicateImages \
+   -dCompressFonts=true \
+   -sPAPERSIZE=a4 \
+   -dPDFFitPage \
+   -r"${DPI}" \
+   -sColorConversionStrategy=Gray \
+   -sProcessColorModel=DeviceGray \
+   -dHaveTransparency=false \
+   -sOutputFile=output.pdf \
+   page-*.pdf
